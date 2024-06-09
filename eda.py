@@ -1,12 +1,10 @@
 import pandas as pd
-import matplotlib as plt
 import glob
 import os
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
-
 
 # Define the path to the folder containing the CSV files
 csv_folder_path = r'C:\Users\HCS2022\Desktop\CICEVSE2024_Dataset\csv files'
@@ -17,11 +15,11 @@ csv_files = glob.glob(os.path.join(csv_folder_path, '*.csv'))
 # Load the CSV files into a dataframe
 dfs = [pd.read_csv(file, low_memory=False) for file in csv_files]
 
-# assign individual dataframes to reduce dimensionality
+# Assign individual dataframes to reduce dimensionality
 kernel_events = dfs[0]
 power_consumption = dfs[1]
 
-# subset kernel events
+# Subset kernel events -> all contain numerical data
 kernel_events_reduced = kernel_events[
     [
         'instructions', 'cache-misses', 'exc_taken', 'cpu-migrations', 'dTLB-store-misses',
@@ -32,36 +30,56 @@ kernel_events_reduced = kernel_events[
     ]
 ]
 
+# Drop time -> use in a later model
 power_consumption.drop('time', axis=1, inplace=True)
 
-# subset of 2000 random rows for both files 
-num_rows = 2000
+# Subset of 500 random rows for both files
+num_rows = 500
+
 kernel_events_reduced_subset = kernel_events_reduced.sample(n=num_rows, random_state=42)
 power_consumption_subset = power_consumption.sample(n=num_rows, random_state=42)
 
-# combine both files (shape = 2000 x 29)
+# Combine both files
 combined_data = pd.concat([kernel_events_reduced_subset.reset_index(drop=True),
                            power_consumption_subset.reset_index(drop=True)], axis=1)
 
-# seperate the features (X) and the target (y)
-y = combined_data['Label']
-X = combined_data.drop('Label', axis=1)
+# One-hot encode the categorical columns: 'state', 'attack', 'attack-group', 'Label'
+categorical_columns = ['State', 'Attack', 'Attack-Group', 'Label', 'interface']
+combined_data_encoded = pd.get_dummies(combined_data, columns=categorical_columns)
 
-# seperate data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Remove rows with missing values
+combined_data_encoded = combined_data_encoded.dropna()
 
-# initialize model
+# Separate the features (X) and the target (y)
+y = combined_data_encoded[[col for col in combined_data_encoded.columns if col.startswith('Label_')]]
+X = combined_data_encoded.drop([col for col in combined_data_encoded.columns if col.startswith('Label_')], axis=1)
+
+# Seperate data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+
+# Standardize the numerical features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Initialize model
 trees = RandomForestClassifier(n_estimators=100, random_state=42)
 
-# train the model
-trees.fit(X_train, y_train)
+# Perform cross-validation
+cv_scores = cross_val_score(trees, X, y, cv=5)  # 5-fold cross-validation
 
-# make predictions on test data
+# Print the mean cross-validation score
+print(f"Mean Cross-Validation Accuracy: {cv_scores.mean()}")
+
+# Train the model on the entire dataset
+trees.fit(X, y)
+
+# Make predictions on test data
 y_pred = trees.predict(X_test)
 
-# evaluate accuracy
+# Evaluate accuracy
 accuracy = accuracy_score(y_test, y_pred)
 
-print(f"Accuracy: {accuracy}")
+print(f"Accuracy on Test Set: {accuracy}")
 
-# the above model does not work because i have categorical data 
+# the model above works but it alwasy results in 100% accuracy and i cannot figure out why
