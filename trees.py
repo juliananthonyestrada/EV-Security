@@ -33,8 +33,8 @@ kernel_events_reduced = kernel_events[
 # Drop time -> use in a later model
 power_consumption.drop('time', axis=1, inplace=True)
 
-# Subset of 500 random rows for both files
-num_rows = 500
+# Subset of 5000 random rows for both files
+num_rows = 5000
 
 kernel_events_reduced_subset = kernel_events_reduced.sample(n=num_rows, random_state=42)
 power_consumption_subset = power_consumption.sample(n=num_rows, random_state=42)
@@ -48,7 +48,7 @@ categorical_columns = ['State', 'Attack', 'Attack-Group', 'Label', 'interface']
 combined_data_encoded = pd.get_dummies(combined_data, columns=categorical_columns)
 
 # Remove rows with missing values
-combined_data_encoded = combined_data_encoded.dropna()
+combined_data_encoded = combined_data_encoded.dropna() 
 
 # Separate the features (X) and the target (y)
 y = combined_data_encoded[[col for col in combined_data_encoded.columns if col.startswith('Label_')]]
@@ -63,7 +63,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Initialize model
-trees = RandomForestClassifier(n_estimators=100, random_state=42)
+trees = RandomForestClassifier(n_estimators=50, random_state=42)
 
 # Perform cross-validation
 cv_scores = cross_val_score(trees, X, y, cv=5)  # 5-fold cross-validation
@@ -82,4 +82,4 @@ accuracy = accuracy_score(y_test, y_pred)
 
 print(f"Accuracy on Test Set: {accuracy}")
 
-# the model above works but it alwasy results in 100% accuracy and i cannot figure out why
+# the model above works but it always results in 100% accuracy and i cannot figure out why
